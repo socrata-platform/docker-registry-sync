@@ -1,0 +1,8 @@
+*.gem
+*.swp
+bin/*
+!bin/docker-registry-sync
+.bundle/
+coverage/
+install.sh
+test.rb

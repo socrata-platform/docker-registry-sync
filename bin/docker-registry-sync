@@ -1,0 +1,107 @@
+#!/usr/bin/env ruby
+require 'optparse'
+require 'docker/registry/sync'
+
+include Docker::Registry::Sync
+
+def verify_opts(opts, command)
+  source_defined = !opts[:source_bucket].nil?
+  dest_defined = !opts[:target_buckets].nil?
+  queue_defined = !opts[:sqs_queue].nil?
+  if command == 'sync'
+    source_defined && dest_defined
+  elsif command == 'queue-sync'
+    source_defined && dest_defined && queue_defined
+  elsif command == 'run-sync'
+    queue_defined
+  else
+    false
+  end
+end
+
+options = {}
+opt_parser = OptionParser.new do |opts|
+  opts.banner = <<EOC
+docker-registry-sync [options] sync <image>:<tag>
+docker-registry-sync [options] queue-sync <image>:<tag>
+docker-registry-sync [options] run-sync
+
+Available commands:
+  sync -- Sync docker image from one source registry S3 bucket to one or more S3 buckets.
+
+Options:
+EOC
+  options[:source_bucket] = nil
+  opts.on('-s SOUCE', '--source-bucket SOURCE', 'Primary docker registry S3 bucket. Pass as <region>:<bucket> [required]') do |b|
+    options[:source_bucket] = b
+  end
+
+  options[:target_buckets] = nil
+  opts.on('-t TARGETS', '--target-buckets TARGETS', 'S3 buckets to sync to, comma separated. Pass as <region>:<bucket>[,<region>:<bucket>]  [required]') do |t|
+    options[:target_buckets] = t
+  end
+
+  options[:sqs_queue] = nil
+  opts.on('-q SQS_QUEUE', '--queue SQS_QUEUE', 'SQS queue url used to enqueue sync job. Pass as <region>:<uri> (do not include schema) [required if using queue-sync or run-sync]') do |b|
+    options[:sqs_queue] = b
+  end
+
+  options[:unset_proxy] = false
+  opts.on(nil, '--unset-proxy', "Use if 'http_proxy' is set in your environment, but you don't want to use it...") do |u|
+    options[:unset_proxy] = true
+  end
+end
+
+opt_parser.version = VERSION
+opt_parser.parse!
+
+cmd = ARGV[0]
+unless !cmd.nil?
+  puts "Command must be supplied!\n\n"
+  puts opt_parser
+  exit 1
+end
+
+image = ARGV[1]
+if image.nil? && !['queue-sync', 'run-sync'].include?(cmd)
+  puts "Image and tag to sync must be supplied!\n\n"
+  puts opt_parser
+  exit 1
+end
+
+if options[:unset_proxy]
+  ENV['http_proxy'] = nil
+end
+
+unless verify_opts(options, cmd)
+  puts "Both '--source-bucket' and '--target-buckets' must be defined for 'sync' and 'queue-sync' commands\n"
+  puts "'--queue' must be defined for 'queue-sync' and 'run-sync' commands\n\n"
+  puts opt_parser
+  exit 1
+end
+
+CMD.configure(
+    options[:source_bucket],
+    options[:target_buckets],
+    options[:sqs_queue]
+)
+
+ec = 1
+
+
+case cmd
+when 'sync'
+  image, tag = image.split(':')
+  ec = CMD.sync(image, tag)
+when 'queue-sync'
+  image, tag = image.split(':')
+  ec = CMD.queue_sync(image, tag)
+when 'run-sync'
+  ec = CMD.run_sync()
+else
+  puts "Unknown command: #{cmd}"
+  puts opt_parser
+  ec = 1
+end
+
+exit(ec)
