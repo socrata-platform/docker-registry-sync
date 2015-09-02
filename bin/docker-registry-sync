@@ -56,7 +56,7 @@ opt_parser.version = VERSION
 opt_parser.parse!
 
 cmd = ARGV[0]
-unless !cmd.nil?
+if cmd.nil?
   puts "Command must be supplied!\n\n"
   puts opt_parser
   exit 1
@@ -81,9 +81,9 @@ unless verify_opts(options, cmd)
 end
 
 CMD.configure(
-    options[:source_bucket],
-    options[:target_buckets],
-    options[:sqs_queue]
+  options[:source_bucket],
+  options[:target_buckets],
+  options[:sqs_queue]
 )
 
 ec = 1
