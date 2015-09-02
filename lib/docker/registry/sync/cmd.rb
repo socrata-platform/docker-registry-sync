@@ -26,12 +26,12 @@ module Docker
           def configure_signal_handlers
             @terminated = false
 
-            Signal.trap("INT") do
-              @config.logger.error "Received INT signal..."
+            Signal.trap('INT') do
+              @config.logger.error 'Received INT signal...'
               @terminated = true
             end
-            Signal.trap("TERM") do
-              @config.logger.error "Received TERM signal..."
+            Signal.trap('TERM') do
+              @config.logger.error 'Received TERM signal...'
               @terminated = true
             end
           end
@@ -50,19 +50,17 @@ module Docker
 
           def queue_sync(image, tag)
             msgs = @config.target_buckets.map do |region, bucket|
-              JSON.dump({
-                retries: 0,
-                image: image,
-                tag: tag,
-                source: {
-                  bucket: @config.source_bucket,
-                  region: @config.source_region
-                },
-                target: {
-                  bucket: bucket,
-                  region: region
-                }
-              })
+              JSON.dump(retries: 0,
+                        image: image,
+                        tag: tag,
+                        source: {
+                          bucket: @config.source_bucket,
+                          region: @config.source_region
+                        },
+                        target: {
+                          bucket: bucket,
+                          region: region
+                        })
             end
             send_message_batch(msgs) ? 0 : 1
           end
@@ -71,14 +69,14 @@ module Docker
             ec = 1
             configure_signal_handlers
             begin
-              @config.logger.info "Polling queue for images to sync..."
+              @config.logger.info 'Polling queue for images to sync...'
               sqs = Aws::SQS::Client.new(region: @config.sqs_region)
-              resp = sqs.receive_message({
+              resp = sqs.receive_message(
                 queue_url: @config.sqs_url,
                 max_number_of_messages: 1,
                 visibility_timeout: 900, # Give ourselves 15min to sync the image
                 wait_time_seconds: 10, # Wait a maximum of 10s for a new message
-              })
+              )
               @config.logger.info "SQS returned #{resp.messages.length} new images to sync..."
               if resp.messages.length == 1
                 message = resp.messages[0]
@@ -107,7 +105,7 @@ module Docker
               sleep @config.empty_queue_sleep_time unless @terminated
             rescue Exception => e
               @config.logger.error "An unknown error occurred while monitoring queue: #{e}"
-              @config.logger.error "Exiting..."
+              @config.logger.error 'Exiting...'
               @terminated = true
               ec = 1
             end until @terminated

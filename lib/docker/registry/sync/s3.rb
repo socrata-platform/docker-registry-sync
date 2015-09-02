@@ -10,7 +10,7 @@ module Docker
           def image_exists?(image, bucket, region)
             s3 = Aws::S3::Client.new(region: region)
             begin
-              s3.head_object({bucket: bucket, key: "registry/repositories/#{image}/_index_images"})
+              s3.head_object(bucket: bucket, key: "registry/repositories/#{image}/_index_images")
             rescue Aws::S3::Errors::NotFound
               false
             else
@@ -23,7 +23,7 @@ module Docker
             keys = []
             img_resp = source_client.list_objects(bucket: source_bucket, prefix: prefix)
 
-            while true
+            loop do
               img_resp.contents.each do |item|
                 keys << item.key
               end
@@ -40,12 +40,10 @@ module Docker
             source_bucket ||= @config.source_bucket
             keys.each do |key|
               @config.logger.info "Syncing key #{source_bucket}/#{key} to bucket #{target_bucket}"
-              target_client.copy_object({
-                acl: 'bucket-owner-full-control',
-                bucket: target_bucket,
-                key: key,
-                copy_source: "#{source_bucket}/#{key}"
-              })
+              target_client.copy_object(acl: 'bucket-owner-full-control',
+                                        bucket: target_bucket,
+                                        key: key,
+                                        copy_source: "#{source_bucket}/#{key}")
             end
           end
 
@@ -57,7 +55,7 @@ module Docker
             s3_target = Aws::S3::Client.new(region: region)
 
             begin
-              keys = ["tag#{tag}_json", "tag_#{tag}", "_index_images"].map do |key|
+              keys = ["tag#{tag}_json", "tag_#{tag}", '_index_images'].map do |key|
                 "registry/repositories/#{image}/#{key}"
               end
               sync_keys(s3_target, bucket, keys)
@@ -86,7 +84,7 @@ module Docker
               img_index_resp = s3_source.get_object(bucket: source_bucket, key: "registry/repositories/#{image}/_index_images")
               JSON.load(img_index_resp.body.read).each do |image|
                 image_prefix = "registry/images/#{image['id']}/"
-	        sync_prefix(s3_source, s3_target, bucket, image_prefix)
+                sync_prefix(s3_source, s3_target, bucket, image_prefix)
               end
             rescue Exception => e
               @config.logger.error "An unexpected error occoured while syncing image #{image}: #{e}"

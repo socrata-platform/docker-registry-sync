@@ -3,10 +3,21 @@ module Docker
     module Sync
       module STDLogLvl
         class << self
-          def debug() 1 end
-          def info() 2 end
-          def error() 3 end
-          def off() 4 end
+          def debug
+            1
+          end
+
+          def info
+            2
+          end
+
+          def error
+            3
+          end
+
+          def off
+            4
+          end
         end
       end
 

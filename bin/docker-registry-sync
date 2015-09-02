@@ -47,7 +47,7 @@ EOC
   end
 
   options[:unset_proxy] = false
-  opts.on(nil, '--unset-proxy', "Use if 'http_proxy' is set in your environment, but you don't want to use it...") do |u|
+  opts.on(nil, '--unset-proxy', "Use if 'http_proxy' is set in your environment, but you don't want to use it...") do |_u|
     options[:unset_proxy] = true
   end
 end
@@ -69,9 +69,7 @@ if image.nil? && !['queue-sync', 'run-sync'].include?(cmd)
   exit 1
 end
 
-if options[:unset_proxy]
-  ENV['http_proxy'] = nil
-end
+ENV['http_proxy'] = nil if options[:unset_proxy]
 
 unless verify_opts(options, cmd)
   puts "Both '--source-bucket' and '--target-buckets' must be defined for 'sync' and 'queue-sync' commands\n"
@@ -88,7 +86,6 @@ CMD.configure(
 
 ec = 1
 
-
 case cmd
 when 'sync'
   image, tag = image.split(':')
@@ -97,7 +94,7 @@ when 'queue-sync'
   image, tag = image.split(':')
   ec = CMD.queue_sync(image, tag)
 when 'run-sync'
-  ec = CMD.run_sync()
+  ec = CMD.run_sync
 else
   puts "Unknown command: #{cmd}"
   puts opt_parser

@@ -8,8 +8,8 @@ Gem::Specification.new do |spec|
   spec.version       = Docker::Registry::Sync::VERSION
   spec.authors       = ['Brian Oldfield']
   spec.email         = ['brian.oldfield@socrata.com']
-  spec.summary       = %q{Sync data between S3 two distinct docker registries using S3 data storage and SNS as a messaging system.}
-  spec.description   = %q{Sync data between S3 two distinct docker registries using S3 data storage and SNS as a messaging system.}
+  spec.summary       = 'Sync data between S3 two distinct docker registries using S3 data storage and SNS as a messaging system.'
+  spec.description   = 'Sync data between S3 two distinct docker registries using S3 data storage and SNS as a messaging system.'
   spec.homepage      = 'http://github.com/socrata-platform/docker-registry-sync'
   spec.license       = 'Apache'
 

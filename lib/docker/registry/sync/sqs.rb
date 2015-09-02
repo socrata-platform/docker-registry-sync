@@ -8,7 +8,7 @@ module Docker
         include Docker::Registry::Sync
 
         class << self
-          def send_message_batch(messages, retries=5)
+          def send_message_batch(messages, retries = 5)
             if retries <= 0
               success = false
               messages.each do |msg|
@@ -20,10 +20,8 @@ module Docker
                 { id: Digest::MD5.hexdigest(msg), message_body: msg }
               end
               sqs = Aws::SQS::Client.new(region: @config.sqs_region)
-              resp = sqs.send_message_batch({
-                queue_url: @config.sqs_url,
-                entries: entries
-              })
+              resp = sqs.send_message_batch(queue_url: @config.sqs_url,
+                                            entries: entries)
               if resp.failed.length > 0
                 rerun = resp.failed.map do |failed|
                   @config.logger.warn "Failed to Enqueue message, re-enqueuing: #{msg}"
@@ -39,11 +37,9 @@ module Docker
           end
 
           def finalize_message(receipt_handle)
-              sqs = Aws::SQS::Client.new(region: @config.sqs_region)
-              resp = sqs.delete_message({
-                queue_url: @config.sqs_url,
-                receipt_handle: receipt_handle
-              })
+            sqs = Aws::SQS::Client.new(region: @config.sqs_region)
+            resp = sqs.delete_message(queue_url: @config.sqs_url,
+                                      receipt_handle: receipt_handle)
           end
         end
       end
