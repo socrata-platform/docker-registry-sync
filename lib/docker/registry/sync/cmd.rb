@@ -10,9 +10,23 @@ module Docker
 
         class << self
           def configure(source_bucket, target_buckets, sqs_queue)
-            source_region, source_bucket = source_bucket.split(':')
-            target_buckets = target_buckets.split(',').collect { |bucket| bucket.split(':') }
-            sqs_region, sqs_uri = sqs_queue.split(':')
+            unless source_bucket.nil?
+              source_region, source_bucket = source_bucket.split(':')
+            else
+              source_region, source_bucket = nil, nil
+            end
+
+            unless target_buckets.nil?
+              target_buckets = target_buckets.split(',').collect { |bucket| bucket.split(':') }
+            else
+              target_buckets = nil
+            end
+
+            unless sqs_queue.nil?
+              sqs_region, sqs_uri = sqs_queue.split(':')
+            else
+              sqs_region, sqs_uri = nil, nil
+            end
             Docker::Registry::Sync.configure do |config|
               config.source_bucket = source_bucket
               config.source_region = source_region

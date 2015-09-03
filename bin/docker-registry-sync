@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 require 'optparse'
 require 'docker/registry/sync'
+require 'aws-sdk'
 
 include Docker::Registry::Sync
 
@@ -63,13 +64,20 @@ if cmd.nil?
 end
 
 image = ARGV[1]
-if image.nil? && !['queue-sync', 'run-sync'].include?(cmd)
+if image.nil? && 'run-sync' != cmd
   puts "Image and tag to sync must be supplied!\n\n"
   puts opt_parser
   exit 1
 end
 
 ENV['http_proxy'] = nil if options[:unset_proxy]
+ENV['https_proxy'] = nil if options[:unset_proxy]
+ENV['HTTP_PROXY'] = nil if options[:unset_proxy]
+ENV['HTTPS_PROXY'] = nil if options[:unset_proxy]
+
+if !(ENV['http_proxy'].nil? || options[:unset_proxy])
+  Aws.config[:http_proxy] = ENV['http_proxy']
+end
 
 unless verify_opts(options, cmd)
   puts "Both '--source-bucket' and '--target-buckets' must be defined for 'sync' and 'queue-sync' commands\n"
