@@ -29,6 +29,8 @@ docker-registry-sync [options] run-sync
 
 Available commands:
   sync -- Sync docker image from one source registry S3 bucket to one or more S3 buckets.
+  queue-sync -- Queue docker image sync job from one source registry S3 bucket to one or more S3 buckets.
+  run-sync -- Run queued sysnc jobs
 
 Options:
 EOC
@@ -45,6 +47,11 @@ EOC
   options[:sqs_queue] = nil
   opts.on('-q SQS_QUEUE', '--queue SQS_QUEUE', 'SQS queue url used to enqueue sync job. Pass as <region>:<uri> (do not include schema) [required if using queue-sync or run-sync]') do |b|
     options[:sqs_queue] = b
+  end
+
+  options[:proxy] = nil
+  opts.on('-p PROXY', '--proxy PROXY', "HTTP proxy URL") do |p|
+    options[:proxy] = p
   end
 
   options[:unset_proxy] = false
@@ -70,13 +77,13 @@ if image.nil? && 'run-sync' != cmd
   exit 1
 end
 
-ENV['http_proxy'] = nil if options[:unset_proxy]
-ENV['https_proxy'] = nil if options[:unset_proxy]
-ENV['HTTP_PROXY'] = nil if options[:unset_proxy]
-ENV['HTTPS_PROXY'] = nil if options[:unset_proxy]
 
-if !(ENV['http_proxy'].nil? || options[:unset_proxy])
-  Aws.config[:http_proxy] = ENV['http_proxy']
+unless options[:unset_proxy]
+  Aws.config[:http_proxy] = if options[:proxy].nil?
+    ENV['http_proxy']
+  else
+    options[:proxy]
+  end
 end
 
 unless verify_opts(options, cmd)
