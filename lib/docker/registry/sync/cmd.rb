@@ -56,7 +56,7 @@ module Docker
               if image_exists?(image, bucket, region)
                 success = sync_tag(image, tag, bucket, region)
               else
-                success = sync_image(image, bucket, region)
+                success = sync_repo(image, bucket, region)
               end
             end
             success ? 0 : 1
@@ -107,7 +107,7 @@ module Docker
                   end
                 else
                   @config.logger.info("Syncing image: #{data['image']} to #{data['target']['region']}:#{data['target']['bucket']}")
-                  if sync_image(data['image'], data['target']['bucket'], data['target']['region'], data['source']['bucket'], data['source']['region'])
+                  if sync_repo(data['image'], data['target']['bucket'], data['target']['region'], data['source']['bucket'], data['source']['region'])
                     @config.logger.info("Finished syncing image: #{data['image']} to #{data['target']['region']}:#{data['target']['bucket']}")
                     finalize_message(message.receipt_handle)
                   else

@@ -32,18 +32,21 @@ module Docker
           def debug(msg)
             if do_log?(:debug, Docker::Registry::Sync.config.log_level)
               STDOUT.puts "[DEBUG] #{msg}"
+              STDOUT.flush
             end
           end
 
           def info(msg)
             if do_log?(:info, Docker::Registry::Sync.config.log_level)
               STDOUT.puts "[INFO] #{msg}"
+              STDOUT.flush
             end
           end
 
           def error(msg)
             if do_log?(:error, Docker::Registry::Sync.config.log_level)
               STDERR.puts "[ERROR] #{msg}"
+              STDERR.flush
             end
           end
         end

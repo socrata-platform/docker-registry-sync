@@ -18,8 +18,67 @@ module Docker
             end
           end
 
-          def sync_prefix(source_client, target_client, target_bucket, prefix, source_bucket = nil)
+
+          def sync_tag(image, tag, bucket, region, source_bucket = nil, source_region = nil)
+            source_region ||= @config.source_region
             source_bucket ||= @config.source_bucket
+
+            s3_source = Aws::S3::Client.new(region: source_region)
+            s3_target = Aws::S3::Client.new(region: region)
+
+            begin
+              keys = ["tag#{tag}_json", "tag_#{tag}", '_index_images'].map do |key|
+                "registry/repositories/#{image}/#{key}"
+              end
+              sync_keys(s3_target, bucket, keys, source_bucket)
+
+              img_id = s3_source.get_object(bucket: source_bucket, key: "registry/repositories/#{image}/tag_#{tag}").body.read
+              sync_image(img_id, bucket, region, source_bucket, source_region)
+            rescue Exception => e
+              @config.logger.error "An unexpected error occoured while syncing tag #{image}:#{tag}: #{e}"
+              false
+            else
+              true
+            end
+          end
+
+          def sync_repo(repo, bucket, region, source_bucket = nil, source_region = nil)
+            source_region ||= @config.source_region
+            source_bucket ||= @config.source_bucket
+            s3_source = Aws::S3::Client.new(region: source_region)
+            s3_target = Aws::S3::Client.new(region: region)
+
+            begin
+              rep_prefix = "registry/repositories/#{repo}/"
+              sync_prefix(s3_source, s3_target, bucket, rep_prefix, source_bucket)
+
+              img_index_resp = s3_source.get_object(bucket: source_bucket, key: "registry/repositories/#{repo}/_index_images")
+              JSON.load(img_index_resp.body.read).each do |image|
+                sync_image(image['id'], bucket, region, source_bucket, source_region)
+              end
+            rescue Exception => e
+              @config.logger.error "An unexpected error occoured while syncing repo #{repo}: #{e}"
+              false
+            else
+              true
+            end
+          end
+
+          def sync_image(image_id, bucket, region, source_bucket = nil, source_region = nil)
+            source_region ||= @config.source_region
+            source_bucket ||= @config.source_bucket
+            s3_source = Aws::S3::Client.new(region: source_region)
+            s3_target = Aws::S3::Client.new(region: region)
+
+            ancestry_resp = s3_source.get_object(bucket: source_bucket, key: "registry/images/#{image_id}/ancestry")
+            # Ancestry includes self
+            JSON.load(ancestry_resp.body.read).each do |image|
+              sync_prefix(s3_source, s3_target, bucket, "registry/images/#{image}/", source_bucket)
+            end
+          end
+
+          @private
+          def sync_prefix(source_client, target_client, target_bucket, prefix, source_bucket)
             keys = []
             img_resp = source_client.list_objects(bucket: source_bucket, prefix: prefix)
 
@@ -33,64 +92,16 @@ module Docker
                 img_resp.next_page
               end
             end
-            sync_keys(target_client, target_bucket, keys)
+            sync_keys(target_client, target_bucket, keys, source_bucket)
           end
 
-          def sync_keys(target_client, target_bucket, keys, source_bucket = nil)
-            source_bucket ||= @config.source_bucket
+          def sync_keys(target_client, target_bucket, keys, source_bucket)
             keys.each do |key|
               @config.logger.info "Syncing key #{source_bucket}/#{key} to bucket #{target_bucket}"
               target_client.copy_object(acl: 'bucket-owner-full-control',
                                         bucket: target_bucket,
                                         key: key,
                                         copy_source: "#{source_bucket}/#{key}")
-            end
-          end
-
-          def sync_tag(image, tag, bucket, region, source_bucket = nil, source_region = nil)
-            source_region ||= @config.source_region
-            source_bucket ||= @config.source_bucket
-
-            s3_source = Aws::S3::Client.new(region: source_region)
-            s3_target = Aws::S3::Client.new(region: region)
-
-            begin
-              keys = ["tag#{tag}_json", "tag_#{tag}", '_index_images'].map do |key|
-                "registry/repositories/#{image}/#{key}"
-              end
-              sync_keys(s3_target, bucket, keys)
-
-              img_id_resp = s3_source.get_object(bucket: source_bucket, key: "registry/repositories/#{image}/tag_#{tag}")
-              img_prefix = "registry/images/#{img_id_resp.body.read}/"
-              sync_prefix(s3_source, s3_target, bucket, img_prefix)
-            rescue Exception => e
-              @config.logger.error "An unexpected error occoured while syncing tag #{image}:#{tag}: #{e}"
-              false
-            else
-              true
-            end
-          end
-
-          def sync_image(image, bucket, region, source_bucket = nil, source_region = nil)
-            source_region ||= @config.source_region
-            source_bucket ||= @config.source_bucket
-            s3_source = Aws::S3::Client.new(region: source_region)
-            s3_target = Aws::S3::Client.new(region: region)
-
-            begin
-              rep_prefix = "registry/repositories/#{image}/"
-              sync_prefix(s3_source, s3_target, bucket, rep_prefix)
-
-              img_index_resp = s3_source.get_object(bucket: source_bucket, key: "registry/repositories/#{image}/_index_images")
-              JSON.load(img_index_resp.body.read).each do |image|
-                image_prefix = "registry/images/#{image['id']}/"
-                sync_prefix(s3_source, s3_target, bucket, image_prefix)
-              end
-            rescue Exception => e
-              @config.logger.error "An unexpected error occoured while syncing image #{image}: #{e}"
-              false
-            else
-              true
             end
           end
         end
