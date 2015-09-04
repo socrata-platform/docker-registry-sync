@@ -54,6 +54,16 @@ EOC
     options[:proxy] = p
   end
 
+  options[:sse] = false
+  opts.on(nil, '--sse', "Copy S3 objects using SSE on the destination using (AES256 only)") do |_e|
+    options[:sse] = true
+  end
+
+  options[:source_sse] = false
+  opts.on(nil, '--source-sse', "Copy S3 objects when the source is using SSE (AES256 only)") do |_e|
+    options[:sse] = true
+  end
+
   options[:unset_proxy] = false
   opts.on(nil, '--unset-proxy', "Use if 'http_proxy' is set in your environment, but you don't want to use it...") do |_u|
     options[:unset_proxy] = true
@@ -96,7 +106,9 @@ end
 CMD.configure(
   options[:source_bucket],
   options[:target_buckets],
-  options[:sqs_queue]
+  options[:sqs_queue],
+  options[:sse],
+  options[:source_sse]
 )
 
 ec = 1

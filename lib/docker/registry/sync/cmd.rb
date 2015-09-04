@@ -9,7 +9,7 @@ module Docker
         include Docker::Registry::Sync
 
         class << self
-          def configure(source_bucket, target_buckets, sqs_queue)
+          def configure(source_bucket, target_buckets, sqs_queue, use_sse, source_uses_sse)
             unless source_bucket.nil?
               source_region, source_bucket = source_bucket.split(':')
             else
@@ -31,6 +31,8 @@ module Docker
               config.source_bucket = source_bucket
               config.source_region = source_region
               config.target_buckets = target_buckets
+              config.source_sse = source_uses_sse
+              config.sse = use_sse
               config.sqs_region = sqs_region
               config.sqs_url = "https://#{sqs_uri}"
             end

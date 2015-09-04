@@ -98,10 +98,17 @@ module Docker
           def sync_keys(target_client, target_bucket, keys, source_bucket)
             keys.each do |key|
               @config.logger.info "Syncing key #{source_bucket}/#{key} to bucket #{target_bucket}"
-              target_client.copy_object(acl: 'bucket-owner-full-control',
-                                        bucket: target_bucket,
-                                        key: key,
-                                        copy_source: "#{source_bucket}/#{key}")
+              opts = {acl: 'bucket-owner-full-control',
+                      bucket: target_bucket,
+                      key: key,
+                      copy_source: "#{source_bucket}/#{key}"}
+              if @config.sse
+                opts[:server_side_encryption] = 'AES256'
+              end
+              if @config.source_sse
+                opts[:copy_source_sse_customer_algorithm] = 'AES256'
+              end
+              target_client.copy_object(opts)
             end
           end
         end
