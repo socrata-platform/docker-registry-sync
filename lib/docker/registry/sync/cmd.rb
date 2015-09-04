@@ -54,18 +54,18 @@ module Docker
 
           def sync(image, tag)
             success = false
-            @config.target_buckets.each do |region, bucket|
+            @config.target_buckets.each do |region, bucket, sse|
               if image_exists?(image, bucket, region)
-                success = sync_tag(image, tag, bucket, region)
+                success = sync_tag(image, tag, bucket, region, !sse.nil?)
               else
-                success = sync_repo(image, bucket, region)
+                success = sync_repo(image, bucket, region, !sse.nil?)
               end
             end
             success ? 0 : 1
           end
 
           def queue_sync(image, tag)
-            msgs = @config.target_buckets.map do |region, bucket|
+            msgs = @config.target_buckets.map do |region, bucket, sse|
               JSON.dump(retries: 0,
                         image: image,
                         tag: tag,
@@ -76,6 +76,7 @@ module Docker
                         target: {
                           bucket: bucket,
                           region: region
+                          sse: !sse.nil?
                         })
             end
             send_message_batch(msgs) ? 0 : 1
@@ -101,7 +102,7 @@ module Docker
 
                 if image_exists?(data['image'], data['target']['bucket'], data['target']['region'])
                   @config.logger.info("Syncing tag: #{data['image']}:#{data['tag']} to #{data['target']['region']}:#{data['target']['bucket']}")
-                  if sync_tag(data['image'], data['tag'], data['target']['bucket'], data['target']['region'], data['source']['bucket'], data['source']['region'])
+                  if sync_tag(data['image'], data['tag'], data['target']['bucket'], data['target']['region'], data['target']['sse'], data['source']['bucket'], data['source']['region'])
                     @config.logger.info("Finished syncing tag: #{data['image']}:#{data['tag']} to #{data['target']['region']}:#{data['target']['bucket']}")
                     finalize_message(message.receipt_handle)
                   else
@@ -109,7 +110,7 @@ module Docker
                   end
                 else
                   @config.logger.info("Syncing image: #{data['image']} to #{data['target']['region']}:#{data['target']['bucket']}")
-                  if sync_repo(data['image'], data['target']['bucket'], data['target']['region'], data['source']['bucket'], data['source']['region'])
+                  if sync_repo(data['image'], data['target']['bucket'], data['target']['region'], data['target']['sse'], data['source']['bucket'], data['source']['region'])
                     @config.logger.info("Finished syncing image: #{data['image']} to #{data['target']['region']}:#{data['target']['bucket']}")
                     finalize_message(message.receipt_handle)
                   else
