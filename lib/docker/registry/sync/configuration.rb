@@ -53,7 +53,7 @@ module Docker
       end
 
       class Configuration
-        attr_accessor :source_bucket, :source_region, :target_buckets, :sqs_region, :sqs_url, :empty_queue_sleep_time
+        attr_accessor :source_bucket, :source_region, :target_buckets, :sqs_region, :sqs_url, :empty_queue_sleep_time, :sse, :source_sse
         attr_accessor :log_level, :logger
 
         def initialize
@@ -64,6 +64,9 @@ module Docker
 
           @sqs_region = nil
           @sqs_url = nil
+
+          @source_sse = false
+          @sse = false
 
           @empty_queue_sleep_time = 5
 
