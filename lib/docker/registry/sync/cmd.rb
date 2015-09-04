@@ -75,7 +75,7 @@ module Docker
                         },
                         target: {
                           bucket: bucket,
-                          region: region
+                          region: region,
                           sse: !sse.nil?
                         })
             end
