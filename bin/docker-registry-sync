@@ -61,7 +61,7 @@ EOC
 
   options[:source_sse] = false
   opts.on(nil, '--source-sse', "Copy S3 objects when the source is using SSE (AES256 only)") do |_e|
-    options[:sse] = true
+    options[:source_sse] = true
   end
 
   options[:unset_proxy] = false
