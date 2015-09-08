@@ -172,6 +172,7 @@ module Docker
               sleep @config.empty_queue_sleep_time unless @terminated
             rescue Exception => e
               @config.logger.error "An unknown error occurred while monitoring queue: #{e}"
+              @config.logger.error e.traceback
               @config.logger.error 'Exiting...'
               @terminated = true
               ec = 1

@@ -101,7 +101,7 @@ module Docker
             keys.each do |key|
               @config.logger.info "Syncing key #{source_bucket}/#{key} to bucket #{target_bucket}"
               opts = {acl: 'bucket-owner-full-control',
-                      region: target_client.get_bucket_location(bucket: target_bucket).location_constraint,
+                      region: target_client.config[:region],
                       bucket: target_bucket,
                       key: key,
                       copy_source: "#{source_bucket}/#{key}"}
@@ -123,6 +123,7 @@ module Docker
               t_index = nil
 
               begin
+                sleep 0.1
                 busy = @threads.select { |t| t.nil? || t.status == false  || t['finished'].nil? == false }.length == 0
               end until !busy
               t_index = @threads.rindex { |t| t.nil? || t.status == false || t['finished'].nil? == false }
