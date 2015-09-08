@@ -1,4 +1,6 @@
 require 'json'
+require 'thread'
+require 'monitor'
 require 'docker/registry/sync/s3'
 require 'docker/registry/sync/sqs'
 
@@ -9,7 +11,7 @@ module Docker
         include Docker::Registry::Sync
 
         class << self
-          def configure(source_bucket, target_buckets, sqs_queue, use_sse, source_uses_sse)
+          def configure(source_bucket, target_buckets, sqs_queue, use_sse, source_uses_sse, pool)
             unless source_bucket.nil?
               source_region, source_bucket = source_bucket.split(':')
             else
@@ -27,6 +29,7 @@ module Docker
             else
               sqs_region, sqs_uri = nil, nil
             end
+
             Docker::Registry::Sync.configure do |config|
               config.source_bucket = source_bucket
               config.source_region = source_region
@@ -34,6 +37,7 @@ module Docker
               config.source_sse = source_uses_sse
               config.sse = use_sse
               config.sqs_region = sqs_region
+              config.pool_size = pool
               config.sqs_url = "https://#{sqs_uri}"
             end
             @config = Docker::Registry::Sync.config
@@ -44,15 +48,53 @@ module Docker
 
             Signal.trap('INT') do
               @config.logger.error 'Received INT signal...'
+              @producer_finished = true
               @terminated = true
             end
             Signal.trap('TERM') do
               @config.logger.error 'Received TERM signal...'
+              @producer_finished = true
               @terminated = true
             end
           end
 
+          def start_workers
+            @threads = Array.new(@config.pool_size)
+            @work_queue = Queue.new
+            @status_queue = Queue.new
+
+            @threads.extend(MonitorMixin)
+            @threads_available = @threads.new_cond
+
+            @producer_finished = false
+            @consumer_thread = Thread.new do
+              sync_key_consumer
+            end
+          end
+
+          def finalize_workers
+            return true
+            @producer_finished = true
+            @consumer_thread.join
+            @threads.each { |t| t.join unless t.nil? }
+            @config.logger.info "Processing job results..."
+
+            success = true
+            loop do
+              begin
+                # One job filure is a run failure
+                success &&= @status_queue.pop(true)
+              rescue ThreadError
+                @config.logger.info "Finished processing job results..."
+                break
+              end
+            end
+            success && !@terminated
+          end
+
           def sync(image, tag)
+            configure_signal_handlers
+            start_workers
             success = false
             @config.target_buckets.each do |region, bucket, sse|
               if image_exists?(image, bucket, region)
@@ -61,6 +103,7 @@ module Docker
                 success = sync_repo(image, bucket, region, !sse.nil?)
               end
             end
+            success &&= finalize_workers
             success ? 0 : 1
           end
 
@@ -85,13 +128,15 @@ module Docker
           def run_sync
             ec = 1
             configure_signal_handlers
+            start_workers
             begin
               @config.logger.info 'Polling queue for images to sync...'
               sqs = Aws::SQS::Client.new(region: @config.sqs_region)
               resp = sqs.receive_message(
                 queue_url: @config.sqs_url,
                 max_number_of_messages: 1,
-                visibility_timeout: 900, # Give ourselves 15min to sync the image
+                #visibility_timeout: 900, # Give ourselves 15min to sync the image
+                visibility_timeout: 30, # Give ourselves 15min to sync the image
                 wait_time_seconds: 10, # Wait a maximum of 10s for a new message
               )
               @config.logger.info "SQS returned #{resp.messages.length} new images to sync..."
@@ -102,15 +147,20 @@ module Docker
 
                 if image_exists?(data['image'], data['target']['bucket'], data['target']['region'])
                   @config.logger.info("Syncing tag: #{data['image']}:#{data['tag']} to #{data['target']['region']}:#{data['target']['bucket']}")
-                  if sync_tag(data['image'], data['tag'], data['target']['bucket'], data['target']['region'], data['target']['sse'], data['source']['bucket'], data['source']['region'])
+                  success = sync_tag(data['image'], data['tag'], data['target']['bucket'], data['target']['region'], data['target']['sse'], data['source']['bucket'], data['source']['region'])
+                  success &&= finalize_workers
+
+                  if success
                     @config.logger.info("Finished syncing tag: #{data['image']}:#{data['tag']} to #{data['target']['region']}:#{data['target']['bucket']}")
                     finalize_message(message.receipt_handle)
                   else
                     @config.logger.info("Falied to sync tag, leaving on queue: #{data['image']}:#{data['tag']} to #{data['target']['region']}:#{data['target']['bucket']}")
                   end
                 else
+                  success = sync_repo(data['image'], data['target']['bucket'], data['target']['region'], data['target']['sse'], data['source']['bucket'], data['source']['region'])
+                  success &&= finalize_workers
                   @config.logger.info("Syncing image: #{data['image']} to #{data['target']['region']}:#{data['target']['bucket']}")
-                  if sync_repo(data['image'], data['target']['bucket'], data['target']['region'], data['target']['sse'], data['source']['bucket'], data['source']['region'])
+                  if success
                     @config.logger.info("Finished syncing image: #{data['image']} to #{data['target']['region']}:#{data['target']['bucket']}")
                     finalize_message(message.receipt_handle)
                   else

@@ -64,6 +64,12 @@ EOC
     options[:source_sse] = true
   end
 
+  options[:pool] = 5
+  opts.on('-n POOL', '--pool POOL', "Size of worker thread pool, defaults to 5.") do |t|
+    puts "pool: #{t}"
+    options[:pool] = t.to_i
+  end
+
   options[:unset_proxy] = false
   opts.on(nil, '--unset-proxy', "Use if 'http_proxy' is set in your environment, but you don't want to use it...") do |_u|
     options[:unset_proxy] = true
@@ -96,6 +102,7 @@ unless options[:unset_proxy]
   end
 end
 
+puts options, cmd
 unless verify_opts(options, cmd)
   puts "Both '--source-bucket' and '--target-buckets' must be defined for 'sync' and 'queue-sync' commands\n"
   puts "'--queue' must be defined for 'queue-sync' and 'run-sync' commands\n\n"
@@ -108,7 +115,8 @@ CMD.configure(
   options[:target_buckets],
   options[:sqs_queue],
   options[:sse],
-  options[:source_sse]
+  options[:source_sse],
+  options[:pool]
 )
 
 ec = 1

@@ -36,6 +36,7 @@ module Docker
               sync_image(img_id, bucket, region, sse, source_bucket, source_region)
             rescue Exception => e
               @config.logger.error "An unexpected error occoured while syncing tag #{image}:#{tag}: #{e}"
+              @config.logger.error e.backtrace
               false
             else
               true
@@ -58,6 +59,7 @@ module Docker
               end
             rescue Exception => e
               @config.logger.error "An unexpected error occoured while syncing repo #{repo}: #{e}"
+              @config.logger.error e.backtrace
               false
             else
               true
@@ -99,6 +101,7 @@ module Docker
             keys.each do |key|
               @config.logger.info "Syncing key #{source_bucket}/#{key} to bucket #{target_bucket}"
               opts = {acl: 'bucket-owner-full-control',
+                      region: target_client.get_bucket_location(bucket: target_bucket).location_constraint,
                       bucket: target_bucket,
                       key: key,
                       copy_source: "#{source_bucket}/#{key}"}
@@ -108,7 +111,52 @@ module Docker
               if @config.source_sse
                 opts[:copy_source_sse_customer_algorithm] = 'AES256'
               end
-              target_client.copy_object(opts)
+              @work_queue << opts
+              sleep 0.1
+            end
+          end
+
+          def sync_key_consumer
+            @config.logger.info "Starting sync consumer..."
+            loop do
+              break if @producer_finished && @work_queue.length == 0
+              t_index = nil
+
+              begin
+                busy = @threads.select { |t| t.nil? || t.status == false  || t['finished'].nil? == false }.length == 0
+              end until !busy
+              t_index = @threads.rindex { |t| t.nil? || t.status == false || t['finished'].nil? == false }
+
+              begin
+                opts = @work_queue.pop(true)
+              rescue ThreadError
+                @config.logger.info "No work found on the queue, sleeping..."
+                sleep 1
+              else
+                if opts[:key]
+                  @threads[t_index].join unless @threads[t_index].nil?
+                  @threads[t_index] = Thread.new do
+                    @config.logger.info "Worker syncing key: #{opts[:key]}"
+                    target_client = Aws::S3::Client.new(region: opts[:region])
+                    opts.delete :region
+                    success = false
+                    begin
+                      target_client.copy_object(opts)
+                      success = true
+                    rescue Exception => e
+                      @config.logger.error "An unknown error occoured while copying object in s3: #{e}"
+                      @config.logger.error e.backtrace
+                    end
+                    Thread.current['finished'] = true
+                    @threads.synchronize do
+                      @status_queue << success
+                    end
+                    @config.logger.info "Worker finished syncing key: #{opts[:key]}"
+                  end
+                else
+                  @config.logger.info "Queued work empty: #{opts}"
+                end
+              end
             end
           end
         end
