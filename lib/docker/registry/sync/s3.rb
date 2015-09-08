@@ -101,6 +101,7 @@ module Docker
             keys.each do |key|
               @config.logger.info "Syncing key #{source_bucket}/#{key} to bucket #{target_bucket}"
               opts = {acl: 'bucket-owner-full-control',
+                      region: target_client.get_bucket_location(bucket: target_bucket).location_constraint,
                       bucket: target_bucket,
                       key: key,
                       copy_source: "#{source_bucket}/#{key}"}
@@ -136,8 +137,8 @@ module Docker
                   @threads[t_index].join unless @threads[t_index].nil?
                   @threads[t_index] = Thread.new do
                     @config.logger.info "Worker syncing key: #{opts[:key]}"
-                    region = target_client.get_bucket_location(bucket: opts[:bucket]).location_constraint
-                    target_client = Aws::S3::Client.new(region: region)
+                    target_client = Aws::S3::Client.new(region: opts[:region])
+                    opts.delete :region
                     success = false
                     begin
                       target_client.copy_object(opts)
