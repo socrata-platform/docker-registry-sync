@@ -30,6 +30,8 @@ module Docker
               sqs_region, sqs_uri = nil, nil
             end
 
+            @synced_images = RingBuffer.new 5000
+
             Docker::Registry::Sync.configure do |config|
               config.source_bucket = source_bucket
               config.source_region = source_region
@@ -135,8 +137,7 @@ module Docker
               resp = sqs.receive_message(
                 queue_url: @config.sqs_url,
                 max_number_of_messages: 1,
-                #visibility_timeout: 900, # Give ourselves 15min to sync the image
-                visibility_timeout: 30, # Give ourselves 15min to sync the image
+                visibility_timeout: 900, # Give ourselves 15min to sync the image
                 wait_time_seconds: 10, # Wait a maximum of 10s for a new message
               )
               @config.logger.info "SQS returned #{resp.messages.length} new images to sync..."
