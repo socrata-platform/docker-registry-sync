@@ -75,7 +75,6 @@ module Docker
           end
 
           def finalize_workers
-            return true
             @producer_finished = true
             @consumer_thread.join
             @threads.each { |t| t.join unless t.nil? }
@@ -130,7 +129,6 @@ module Docker
           def run_sync
             ec = 1
             configure_signal_handlers
-            start_workers
             begin
               @config.logger.info 'Polling queue for images to sync...'
               sqs = Aws::SQS::Client.new(region: @config.sqs_region)
@@ -147,6 +145,7 @@ module Docker
                 @config.logger.info "Image sync data:  #{data}"
 
                 if image_exists?(data['image'], data['target']['bucket'], data['target']['region'])
+                  start_workers
                   @config.logger.info("Syncing tag: #{data['image']}:#{data['tag']} to #{data['target']['region']}:#{data['target']['bucket']}")
                   success = sync_tag(data['image'], data['tag'], data['target']['bucket'], data['target']['region'], data['target']['sse'], data['source']['bucket'], data['source']['region'])
                   success &&= finalize_workers
@@ -158,6 +157,7 @@ module Docker
                     @config.logger.info("Falied to sync tag, leaving on queue: #{data['image']}:#{data['tag']} to #{data['target']['region']}:#{data['target']['bucket']}")
                   end
                 else
+                  start_workers
                   success = sync_repo(data['image'], data['target']['bucket'], data['target']['region'], data['target']['sse'], data['source']['bucket'], data['source']['region'])
                   success &&= finalize_workers
                   @config.logger.info("Syncing image: #{data['image']} to #{data['target']['region']}:#{data['target']['bucket']}")
