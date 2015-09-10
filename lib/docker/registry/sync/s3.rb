@@ -75,9 +75,9 @@ module Docker
             ancestry_resp = s3_source.get_object(bucket: source_bucket, key: "registry/images/#{image_id}/ancestry")
             # Ancestry includes self
             JSON.load(ancestry_resp.body.read).each do |image|
-              unless @synced_images.include? image
+              unless @synced_images.include? "#{image}:#{region}:#{bucket}"
                 sync_prefix(s3_source, s3_target, bucket, sse, "registry/images/#{image}/", source_bucket)
-                @synced_images << image
+                @synced_images << "#{image}:#{region}:#{bucket}"
               end
             end
           end

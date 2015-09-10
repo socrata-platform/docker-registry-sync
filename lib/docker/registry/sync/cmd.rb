@@ -30,7 +30,7 @@ module Docker
               sqs_region, sqs_uri = nil, nil
             end
 
-            @synced_images = RingBuffer.new 5000
+            @synced_images = RingBuffer.new 10000
 
             Docker::Registry::Sync.configure do |config|
               config.source_bucket = source_bucket
