@@ -34,7 +34,7 @@ module Docker
 
               img_id = s3_source.get_object(bucket: source_bucket, key: "registry/repositories/#{image}/tag_#{tag}").body.read
               sync_image(img_id, bucket, region, sse, source_bucket, source_region)
-            rescue Exception => e
+            rescue => e
               @config.logger.error "An unexpected error occoured while syncing tag #{image}:#{tag}: #{e}"
               @config.logger.error e.backtrace
               false
@@ -57,7 +57,7 @@ module Docker
               JSON.load(img_index_resp.body.read).each do |image|
                 sync_image(image['id'], bucket, region, sse, source_bucket, source_region)
               end
-            rescue Exception => e
+            rescue => e
               @config.logger.error "An unexpected error occoured while syncing repo #{repo}: #{e}"
               @config.logger.error e.backtrace
               false
@@ -147,15 +147,16 @@ module Docker
                     begin
                       target_client.copy_object(opts)
                       success = true
-                    rescue Exception => e
+                      @config.logger.info "Worker finished syncing key: #{opts[:key]}"
+                    rescue => e
                       @config.logger.error "An unknown error occoured while copying object in s3: #{e}"
                       @config.logger.error e.backtrace
+                    ensure
+                      Thread.current['finished'] = true
+                      @threads.synchronize do
+                        @status_queue << success
+                      end
                     end
-                    Thread.current['finished'] = true
-                    @threads.synchronize do
-                      @status_queue << success
-                    end
-                    @config.logger.info "Worker finished syncing key: #{opts[:key]}"
                   end
                 else
                   @config.logger.info "Queued work empty: #{opts}"

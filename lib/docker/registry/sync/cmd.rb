@@ -52,11 +52,13 @@ module Docker
               @config.logger.error 'Received INT signal...'
               @producer_finished = true
               @terminated = true
+              @work_queue.clear
             end
             Signal.trap('TERM') do
               @config.logger.error 'Received TERM signal...'
               @producer_finished = true
               @terminated = true
+              @work_queue.clear
             end
           end
 
@@ -171,7 +173,7 @@ module Docker
               end
               ec = 0
               sleep @config.empty_queue_sleep_time unless @terminated
-            rescue Exception => e
+            rescue => e
               @config.logger.error "An unknown error occurred while monitoring queue: #{e}"
               @config.logger.error e.traceback
               @config.logger.error 'Exiting...'
