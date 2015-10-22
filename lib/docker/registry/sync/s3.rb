@@ -134,8 +134,8 @@ module Docker
               t_index = @threads.rindex { |t| t.nil? || t.status == false || t['finished'].nil? == false }
 
               begin
-                @threads.synchronize do
-                  opts = @work_queue.pop(true)
+                opts = @threads.synchronize do
+                  @work_queue.pop(true)
                 end
               rescue ThreadError
                 @config.logger.info "No work found on the queue, sleeping..."
