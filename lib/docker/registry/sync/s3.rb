@@ -114,7 +114,9 @@ module Docker
               if @config.source_sse
                 opts[:copy_source_sse_customer_algorithm] = 'AES256'
               end
-              @work_queue << opts
+              @threads.synchronize do
+                @work_queue << opts
+              end
               sleep 0.1
             end
           end
@@ -132,7 +134,9 @@ module Docker
               t_index = @threads.rindex { |t| t.nil? || t.status == false || t['finished'].nil? == false }
 
               begin
-                opts = @work_queue.pop(true)
+                @threads.synchronize do
+                  opts = @work_queue.pop(true)
+                end
               rescue ThreadError
                 @config.logger.info "No work found on the queue, sleeping..."
                 sleep 1

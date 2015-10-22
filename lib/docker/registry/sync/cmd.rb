@@ -50,15 +50,19 @@ module Docker
 
             Signal.trap('INT') do
               @config.logger.error 'Received INT signal...'
-              @producer_finished = true
-              @terminated = true
-              @work_queue.clear
+              @threads.synchronize do
+                @producer_finished = true
+                @terminated = true
+                @work_queue.clear
+              end
             end
             Signal.trap('TERM') do
               @config.logger.error 'Received TERM signal...'
-              @producer_finished = true
-              @terminated = true
-              @work_queue.clear
+              @threads.synchronize do
+                @producer_finished = true
+                @terminated = true
+                @work_queue.clear
+              end
             end
           end
 
@@ -77,7 +81,9 @@ module Docker
           end
 
           def finalize_workers
-            @producer_finished = true
+            @threads.synchronize do
+              @producer_finished = true
+            end
             @consumer_thread.join
             @threads.each { |t| t.join unless t.nil? }
             @config.logger.info "Processing job results..."
