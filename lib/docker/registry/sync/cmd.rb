@@ -120,7 +120,7 @@ module Docker
                 success = sync_repo(image, bucket, region, !sse.nil?)
               end
             end
-            success &&= finalize_workers
+            success = finalize_workers && success
             success ? 0 : 1
           end
 
@@ -165,7 +165,7 @@ module Docker
                   start_workers
                   @config.logger.info("Syncing tag: #{data['image']}:#{data['tag']} to #{data['target']['region']}:#{data['target']['bucket']}")
                   success = sync_tag(data['image'], data['tag'], data['target']['bucket'], data['target']['region'], data['target']['sse'], data['source']['bucket'], data['source']['region'])
-                  success &&= finalize_workers
+                  success = finalize_workers && success
 
                   if success
                     @config.logger.info("Finished syncing tag: #{data['image']}:#{data['tag']} to #{data['target']['region']}:#{data['target']['bucket']}")
@@ -177,7 +177,7 @@ module Docker
                   configure_workers
                   start_workers
                   success = sync_repo(data['image'], data['target']['bucket'], data['target']['region'], data['target']['sse'], data['source']['bucket'], data['source']['region'])
-                  success &&= finalize_workers
+                  success = finalize_workers && success
                   @config.logger.info("Syncing image: #{data['image']} to #{data['target']['region']}:#{data['target']['bucket']}")
                   if success
                     @config.logger.info("Finished syncing image: #{data['image']} to #{data['target']['region']}:#{data['target']['bucket']}")
