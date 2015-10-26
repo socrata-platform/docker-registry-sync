@@ -99,7 +99,7 @@ module Docker
             loop do
               begin
                 # One job filure is a run failure
-                success &&= @status_queue.pop(true)
+                success = @status_queue.pop(true) && success
               rescue ThreadError
                 @config.logger.info "Finished processing job results..."
                 break
