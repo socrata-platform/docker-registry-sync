@@ -11,7 +11,9 @@ module Docker
         include Docker::Registry::Sync
 
         class << self
-          def configure(source_bucket, target_buckets, sqs_queue, use_sse, source_uses_sse, pool)
+          attr_accessor :config, :producer_finished, :work_queue, :status_queue, :threads
+
+          def configure(source_bucket, target_buckets, sqs_queue, use_sse, source_uses_sse, pool, log_level = :debug)
             unless source_bucket.nil?
               source_region, source_bucket = source_bucket.split(':')
             else
@@ -41,6 +43,7 @@ module Docker
               config.sqs_region = sqs_region
               config.pool_size = pool
               config.sqs_url = "https://#{sqs_uri}"
+              config.log_level = log_level
             end
             @config = Docker::Registry::Sync.config
           end
@@ -66,7 +69,7 @@ module Docker
             end
           end
 
-          def start_workers
+          def configure_workers
             @threads = Array.new(@config.pool_size)
             @work_queue = Queue.new
             @status_queue = Queue.new
@@ -75,6 +78,9 @@ module Docker
             @threads_available = @threads.new_cond
 
             @producer_finished = false
+          end
+
+          def start_workers
             @consumer_thread = Thread.new do
               sync_key_consumer
             end
@@ -85,6 +91,7 @@ module Docker
               @producer_finished = true
             end
             @consumer_thread.join
+            @consumer_thread = nil
             @threads.each { |t| t.join unless t.nil? }
             @config.logger.info "Processing job results..."
 
@@ -103,6 +110,7 @@ module Docker
 
           def sync(image, tag)
             configure_signal_handlers
+            configure_workers
             start_workers
             success = false
             @config.target_buckets.each do |region, bucket, sse|
@@ -153,6 +161,7 @@ module Docker
                 @config.logger.info "Image sync data:  #{data}"
 
                 if image_exists?(data['image'], data['target']['bucket'], data['target']['region'])
+                  configure_workers
                   start_workers
                   @config.logger.info("Syncing tag: #{data['image']}:#{data['tag']} to #{data['target']['region']}:#{data['target']['bucket']}")
                   success = sync_tag(data['image'], data['tag'], data['target']['bucket'], data['target']['region'], data['target']['sse'], data['source']['bucket'], data['source']['region'])
@@ -165,6 +174,7 @@ module Docker
                     @config.logger.info("Falied to sync tag, leaving on queue: #{data['image']}:#{data['tag']} to #{data['target']['region']}:#{data['target']['bucket']}")
                   end
                 else
+                  configure_workers
                   start_workers
                   success = sync_repo(data['image'], data['target']['bucket'], data['target']['region'], data['target']['sse'], data['source']['bucket'], data['source']['region'])
                   success &&= finalize_workers
@@ -179,12 +189,13 @@ module Docker
               end
               ec = 0
               sleep @config.empty_queue_sleep_time unless @terminated
-            rescue => e
+            rescue StandardError => e
               @config.logger.error "An unknown error occurred while monitoring queue: #{e}"
               @config.logger.error e.traceback
               @config.logger.error 'Exiting...'
               @terminated = true
               ec = 1
+              finalize_workers # make sure there are no hangers-on
             end until @terminated
             ec
           end

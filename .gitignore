@@ -3,6 +3,7 @@
 bin/*
 !bin/docker-registry-sync
 .bundle/
+Gemfile.lock
 coverage/
 install.sh
 test.rb
