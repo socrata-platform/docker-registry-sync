@@ -28,9 +28,9 @@ Currently only tested with the legacy [docker-registry](https://github.com/docke
 
 | required                 | short flag     | long flag                  | Description |
 |--------------------------|----------------|----------------------------|-------------|
-| Yes                      | `-s SOURCE`    | `--source-bucket SOURCE`   |   Primary docker registry S3 bucket. Pass as <region>:<bucket> |
-| Yes                      | `-t TARGETS`   | `--target-buckets TARGETS` |   S3 buckets to sync to, comma separated. Pass as <region>:<bucket>[,<region>:<bucket>] |
-| for run-sync, queue-sync | `-q SQS_QUEUE` | `--queue SQS_QUEUE`        |   SQS queue url used to enqueue sync job. Pass as <region>:<uri> (do not include schema) |
+| Yes                      | `-s SOURCE`    | `--source-bucket SOURCE`   |   Primary docker registry S3 bucket. Pass as \<region>:\<bucket> |
+| Yes                      | `-t TARGETS`   | `--target-buckets TARGETS` |   S3 buckets to sync to, comma separated. Pass as \<region>:\<bucket>[,\<region>:\<bucket>] |
+| for run-sync, queue-sync | `-q SQS_QUEUE` | `--queue SQS_QUEUE`        |   SQS queue url used to enqueue sync job. Pass as \<region>:\<uri> (do not include schema) |
 | No                       | `-p PROXY`     | `--proxy PROXY`            |   HTTP proxy URL |
 | No                       |                | `--sse`                    |   Copy S3 objects using SSE on the destination using (AES256 only) |
 | No                       |                | `--source-sse`             |   Copy S3 objects when the source is using SSE (AES256 only) |
